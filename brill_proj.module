@@ -1,0 +1,377 @@
+<?php
+
+/**
+ * hook_entity_info
+ */
+function brill_proj_entity_info() {
+  return array(
+    'brill_proj' => array(
+      'label' => t('Sample Entity'),
+      //'controller class' => 'DrupalDefaultEntityController', // this is the default
+      'base table' => 'brill_proj',
+      'revision table' => 'brill_proj_revision',
+      //'static cache' => TRUE, // this is the default
+      //'field cache' => TRUE, // this is the default
+      'load hook' => 'brill_proj_load', // function to use to load data for this entity
+      'uri callback' => 'brill_proj_uri', // given an entity, this function will return the data for constructing the path to the detail of the entity
+      //'label callback' => 'brill_proj_label', // only needed if the label for the entity isn't a straight property
+      'fieldable' => TRUE, // let this entity be extended with fields
+      'entity keys' => array( // give field api the info it needs to interact with the entity
+        'label' => 'mech_name', // the property that contains the name for each instance of this entity
+        'id' => 'sid', // the property that uniquely identifies this entity (must be numeric)
+        'revision' => 'rev_id', // if the entity keeps revisions, the property identifying the revision id
+        //'bundle' => 'type', // if the entity has multiple bundles, the property that identifies the bundle, type is the bundle for the node entity as an example
+      ),
+      /* if the paths defined in the bundle section contain wildcards indicating a loadable object this indicates the property
+         of the bundle necessary to construct the real path
+      'bundle keys' => array(
+        'bundle' => 'type',
+      ),
+      */
+      'bundles' => array( // if you have only one bundle, then key it based on your entity key
+        'brill_proj' => array(
+          'label' => t('Default Bundle'), // human readable name
+          'admin' => array(
+            'path' => 'admin/structure/brill_proj', // a path you'll define in hook menu later for the admin page of this bundle, this is where the manage fields tabs will get tacked on if this is a fieldable entity
+            //'real path' => 'admin/structure/brill_proj/brill_proj', // if path were admin/structure/brill_proj/%brill_proj_type then this would be required and the second brill_proj would represent the bundle key, this is useful for entities which allow dynamic bundle creation
+            //'bundle argument' => 3, // if real path is used, point at the arg which represents the bundle
+            //'access callback' => 'user_access', // user access is the default
+            'access arguments' => array('administer site configuration'), // probably best to define an explicit permission for controlling the structure of this entity, for node this is 'administer content types'
+          ),
+        ),
+      ),
+      'view modes' => array( // define what viewing modes your entity will support
+        'full' => array( // key for the view mode
+          'label' => t('Full'), // human readable name
+          'custom settings' => FALSE, // use custom settings for this view mode out of the box, FALSE indicates to use the implicit default settings
+          // see the node_add_body_field function in node.module and look at the display portion of each entity for an idea of how this is used, note the default and teaser keys
+        ),
+        'teaser' => array(
+          'label' => t('Teaser'),
+          'custom settings' => FALSE,
+        ),
+      ),
+    ),
+  );
+}
+
+/**
+ * define the loadng function specified in the load hook key in brill_proj_entity_info
+ * TODO: need to determine what should be returned if the id doesn't exist
+ */
+function brill_proj_load($brill_proj_id = NULL, $reset = FALSE) {
+  $ids = (isset($brill_proj_id) ? array($brill_proj_id) : array());
+  $brill_projs = brill_proj_load_multiple($ids, NULL, $reset);
+  return $brill_projs[$brill_proj_id];
+}
+
+/**
+ * define a function for loading multiple entities at once so entity_load can be leveraged
+ */
+function brill_proj_load_multiple($ids = array(), $conditions = array(), $reset = FALSE) {
+  return entity_load('brill_proj', $ids, $conditions, $reset);
+}
+
+/**
+ * define the function specified in the uri callback key in brill_proj_entity_info
+ * this needs to match up with a hook menu path defined for showing the details of an entity
+ */
+function brill_proj_uri($brill_proj_entity_instance) {
+  return array('path' => 'brill_proj/' . $brill_proj_entity_instance->sid);
+}
+
+/**
+ * hook menu
+ */
+function brill_proj_menu() {
+  return array(
+    // the admin path for the entity, must match with the path for one of your bundles
+    'admin/structure/brill_proj' => array(
+      'title' => 'Project Structure',
+      'description' => 'Adjust the structure of the brill_proj entity, add fields, etc. Similar to manage content types for nodes',
+      'page callback' => 'brill_proj_admin',
+      'access arguments' => array('administer site configuration'),
+    ),
+    'brill_proj' => array(
+      'title' => 'Projects',
+      'description' => 'List all instances of this entity, this is admin/content for nodes',
+      'page callback' => 'brill_proj_list',
+      'access arguments' => array('view brill_proj'),
+    ),
+    'brill_proj/add' => array(
+      'title' => 'Add a brill_proj',
+      'description' => 'Add a new instance of this entity, this is node/add for nodes',
+      'page callback' => 'brill_proj_add',
+      'access arguments' => array('add brill_proj'),
+    ),
+    'brill_proj/%brill_proj' => array(
+      'title callback' => 'brill_proj_title',
+      'title arguments' => array(1),
+      'description' => 'View an instance of this entity, this is node/%node for nodes',
+      'page callback' => 'brill_proj_view',
+      'page arguments' => array(1),
+      'access arguments' => array('view brill_proj'),
+      'type' => MENU_CALLBACK,
+    ),
+    'brill_proj/%brill_proj/view' => array(
+      'title' => 'View',
+      'type' => MENU_DEFAULT_LOCAL_TASK,
+      'weight' => -10,
+    ),
+    'brill_proj/%brill_proj/edit' => array(
+      'title' => 'Edit',
+      'description' => 'Edit an instance of this entity, this is node/$node/edit for nodes',
+      'page callback' => 'drupal_get_form',
+      'page arguments' => array('brill_proj_form', 1),
+      'access arguments' => array('edit brill_proj'),
+      'type' => MENU_LOCAL_TASK,
+    ),
+  );
+}
+
+/**
+ * administration page for this entity (or a specific bundle if your entity supports them)
+ */
+function brill_proj_admin() {
+  return t('Project Admin Page');
+}
+
+/**
+ * list all the instances of this entity
+ */
+function brill_proj_list() {
+  $brill_projs = brill_proj_load_multiple(FALSE); // load them all
+  $h = array(t('Name'), t('Message'));
+  $t = array();
+  foreach($brill_projs as $s) {
+    $r = array();
+    $r[] = l($s->mech_name, 'brill_proj/' . $s->sid);
+    $r[] = $s->message;
+    $t[] = $r;
+  }
+  return theme('table', array('header' => $h, 'rows' => $t));
+}
+
+/**
+ * page for adding an instance of your entity
+ */
+function brill_proj_add() {
+  $brill_proj = brill_proj_default();
+  return drupal_get_form('brill_proj_form', $brill_proj);
+}
+
+/**
+ * convenience function for creating a blank entity
+ */
+function brill_proj_default() {
+  $brill_proj = new stdclass();
+  $brill_proj->sid = NULL;
+  $brill_proj->mech_name = NULL;
+  $brill_proj->message = NULL;
+  return $brill_proj;
+}
+
+/**
+ * view your entity
+ */
+function brill_proj_view($brill_proj) {
+  $view_mode = 'full';
+  $type = 'brill_proj';
+  $bundle = 'brill_proj';
+  $display = 'default';
+
+  // add additional view data for fields and entities that isn't normally pulled on a load
+  field_attach_prepare_view($type, array($brill_proj->sid => $brill_proj), $view_mode);
+  entity_prepare_view($type, array($brill_proj->sid => $brill_proj));
+
+  $build = array(
+    'mech_name' => array('#markup' => $brill_proj->mech_name, '#prefix' => '<div>', '#suffix' => '</div>'),
+    'message' => array('#markup' => $brill_proj->message, '#prefix' => '<div>', '#suffix' => '</div>'),
+  );
+
+  // honor custom settings for positioning on extra fields, this entire section
+  // can be dropped if this entity does not allow extra settings
+  $view_mode_settings = field_view_mode_settings($type, $bundle);
+  if (isset($view_mode_settings) && isset($view_mode_settings[$view_mode]) && $view_mode_settings[$view_mode]['custom_settings']) {
+    $display = $view_mode;
+  }
+  $bundle_settings = variable_get('field_bundle_settings', array());
+  // if no custom settings have been sved for this entity, load default info and build a structure
+  // in the form of the field_bundle_settings variable
+  if (!isset($bundle_settings) || !isset($bundle_settings[$type]) || !isset($bundle_settings[$type][$bundle])) {
+    $bundle_settings = field_info_extra_fields($type, $bundle, 'display');
+    $tmp = array();
+    foreach ($bundle_settings as $key => $data) {
+      $tmp[$type][$bundle]['extra_fields']['display'][$key][$display] = $data['display'][$display];
+    }
+    $bundle_settings = $tmp;
+  }
+  // pull the bundle settings and apply to each extra field in our build array
+  $extra_field_settings = $bundle_settings[$type][$bundle]['extra_fields']['display'];
+  foreach ($extra_field_settings as $key => $settings) {
+    if ($settings[$display]['visible'] === FALSE) {
+      unset($build[$key]);
+    }
+    else {
+      $build[$key]['#weight'] = $settings[$display]['weight'];
+    }
+  }
+
+  // add in the renderable field data
+  $build += field_attach_view($type, $brill_proj, $view_mode);
+
+  /* the following build array coordinates with the brill_proj_theme declaration
+   *
+   * the variable keys declared in the theme declaration for the value in
+   * #theme, brill_proj in this case, will be used to pull values from the
+   * array under looking in for the key using #variable_name convention
+   */
+  $build = array(
+    '#theme' => 'brill_proj',
+    '#brill_proj' => $brill_proj,
+    '#content' => $build,
+  );
+  // allow other modules to affect display
+  module_invoke_all('entity_view', $brill_proj, 'brill_proj', $view_mode);
+  drupal_alter(array('entity_view'), $build, $brill_proj);
+  return $build;
+}
+
+/**
+ * hook_theme
+ */
+function brill_proj_theme($existing, $type, $theme, $path) {
+  return array(
+    'brill_proj' => array(
+      // brill_proj is the entity object and content is a build array
+      // for any attached fields
+      'variables' => array('brill_proj' => NULL, 'content' => array()),
+      'path' => $path . '/theme',
+      'template' => 'brill_proj',
+    ),
+  );
+}
+
+/**
+ * define a title callback specified in hook menu
+ */
+function brill_proj_title($brill_proj) {
+  drupal_set_title(t('Project @brill_proj', array('@brill_proj' => $brill_proj->mech_name)));
+}
+
+/**
+ * form for adding/editing an entity
+ */
+function brill_proj_form($form, &$form_state, $brill_proj) {
+  if ($brill_proj->sid) {
+    $form['sid'] = array(
+      '#type' => 'hidden',
+      '#default_value' => $brill_proj->sid,
+    );
+  }
+
+  $form['mech_name'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Machine Name'),
+    '#description' => t('The machine name for this instance'),
+    '#max_length' => 50,
+    '#default_value' => $brill_proj->mech_name,
+  );
+
+  $form['message'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Message'),
+    '#description' => t('Some data you care about saving'),
+    '#max_length' => 50,
+    '#default_value' => $brill_proj->message,
+  );
+
+  field_attach_form('brill_proj', $brill_proj, $form, $form_state);
+  $form['submit'] = array(
+    '#type' => 'submit',
+    '#default_value' => t('Save'),
+  );
+  return $form;
+}
+
+/**
+ * validate callback for brill_proj entity editing form
+ */
+//function brill_proj_form_validate($form, &$form_state) {
+//  if ($form_state['values']['sid']) {
+//    $brill_proj = brill_proj_load($form_state['values']['sid']);
+//  }
+//  else {
+//    $brill_proj = brill_proj_default();
+//  }
+//  field_attach_form_validate('brill_proj', $brill_proj, $form, $form_state);
+//}
+
+/**
+ * the submit handler
+ */
+function brill_proj_form_submit($form, &$form_state) {
+  $brill_proj = brill_proj_default();
+  $update = NULL;
+  if (!empty($form_state['values']['sid'])) {
+    $update = 'sid';
+    $brill_proj->sid = $form_state['values']['sid'];;
+  }
+
+  $brill_proj->mech_name = $form_state['values']['mech_name'];
+  $brill_proj->message = $form_state['values']['message'];
+
+  field_attach_submit('brill_proj', $brill_proj, $form, $form_state);
+  // automatically revision every save
+  if ($update) {
+    drupal_write_record('brill_proj_revision', $brill_proj);
+    drupal_write_record('brill_proj', $brill_proj, $update);
+    field_attach_update('brill_proj', $brill_proj, $form, $form_state);
+  }
+  else {
+    drupal_write_record('brill_proj', $brill_proj);
+    drupal_write_record('brill_proj_revision', $brill_proj);
+    $update = 'sid';
+    drupal_write_record('brill_proj', $brill_proj, $update);
+    field_attach_insert('brill_proj', $brill_proj, $form, $form_state);
+  }
+
+  drupal_goto('brill_proj/' . $brill_proj->sid);
+}
+
+/**
+ * hook permission
+ */
+function brill_proj_permission() {
+  return array(
+    'view brill_proj' => array(
+      'title' => t('View brill_proj entity'),
+    ),
+    'add brill_proj' => array(
+      'title' => t('Add brill_proj entity'),
+    ),
+    'edit brill_proj' => array(
+      'title' => t('Edit brill_proj entity'),
+    ),
+  );
+}
+
+/**
+ * hook field extra fields, let the data items of this entity be managed and ordered as though they were fields
+ */
+function brill_proj_field_extra_fields() {
+  $return['brill_proj']['brill_proj']['form'] = array(
+    'mech_name' => array(
+      'label' => t('Machine Name'),
+      'description' => t('Machine Name'),
+      'weight' => -20,
+    ),
+    'message' => array(
+      'label' => t('Message'),
+      'description' => t('Message'),
+      'weight' => -10,
+    ),
+  );
+  $return['brill_proj']['brill_proj']['display'] = $return['brill_proj']['brill_proj']['form'];
+  return $return;
+}
